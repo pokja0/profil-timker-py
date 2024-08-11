@@ -3,19 +3,20 @@ import polars as pl
 
 app_ui = ui.page_sidebar(
     ui.sidebar(
-        ui.input_radio_buttons("radio_timker", "Pilih Timker", choices=["Seluruh Tim Kerja", "Pilih"]),
+        ui.input_radio_buttons("radio_timker", "Pilih Timker", choices=["Seluruh Tim Kerja", "Pilih"], selected="Seluruh Tim Kerja"),
         ui.output_ui("input_timker"),
         ui.input_action_button("tampilkan", "Tampilkan"),
-        "Sidebar", 
         bg="#f8f8f8", 
         open="desktop",
         
     ),  
-    # ui.img(
-    #     src = "https://bkkbnsulbar.id/wp-content/uploads/2022/12/cropped-logobkkbnsulbar.png", widht = "10px"
-    # ),
+    ui.img(
+        src = "https://bkkbnsulbar.id/wp-content/uploads/2022/12/cropped-logobkkbnsulbar.png", width = "200px", style = "justice-"
+    ),
     ui.card(
-        
+        ui.card_header(
+            "PERSENTASE OUTPUT & ANGGARAN"
+        )
     )
 )
 
