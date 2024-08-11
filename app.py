@@ -1,6 +1,10 @@
 from shiny import App, Inputs, Outputs, Session, reactive, render, ui
 import polars as pl
 
+import plotly.express as px
+
+from shinywidgets import output_widget, render_widget  
+
 app_ui = ui.page_sidebar(
     ui.sidebar(
         ui.input_radio_buttons("radio_timker", "Pilih Timker", choices=["Seluruh Tim Kerja", "Pilih"], selected="Seluruh Tim Kerja"),
@@ -16,7 +20,8 @@ app_ui = ui.page_sidebar(
     ui.card(
         ui.card_header(
             "PERSENTASE OUTPUT & ANGGARAN"
-        )
+        ),
+        output_widget("sp_output_realisasi")
     )
 )
 
@@ -79,6 +84,8 @@ def server(input, output, session):
         pl.col("PERSENTASE REALISASI ANGGARAN").round(2)
     )
 
+    output_anggaran = output_anggaran.fill_nan(0)
+
     @render.ui
     def input_timker():
         pilihan_timker = output_anggaran.select(pl.col("KODE TIMKER").unique())
@@ -110,8 +117,92 @@ def server(input, output, session):
             "input.radio_timker == 'Pilih'",
             select_timker
         )
-        
-    pass
+    
+    @render_widget
+    #@reactive.event(input.action_button)
+    def sp_output_realisasi():
+        rekap_oa = output_anggaran.group_by(
+            "KODE TIMKER"
+        ).agg(
+            [pl.col("PERSENTASE CAPAIAN").mean().alias("% CAPAIAN").round(2),
+            pl.col("PERSENTASE REALISASI ANGGARAN").mean().alias("% ANGGARAN").round(2)]
+        )
 
+        if input.radio_timker() == "Seluruh Tim Kerja":
+            filter_timker = output_anggaran.select(pl.col("KODE TIMKER").unique())
+            filter_timker = filter_timker["KODE TIMKER"].to_list()
+        else:
+            filter_timker = input.pilihan_timker()
+
+        rekap_oa = rekap_oa.filter(
+            pl.col("KODE TIMKER").is_in(filter_timker)
+        )
+
+        sulbar = output_anggaran.select(
+            pl.col("PERSENTASE CAPAIAN").mean().alias("% CAPAIAN").round(2),
+            pl.col("PERSENTASE REALISASI ANGGARAN").mean().alias("% ANGGARAN").round(2)
+        )
+
+        # Menambahkan kolom "KODE TIMKER" dengan nilai "Sulbar"
+        sulbar = sulbar.with_columns(pl.lit("Sulbar").alias("KODE TIMKER"))
+
+        # Mengatur ulang kolom agar "KODE TIMKER" menjadi kolom pertama
+        sulbar = sulbar.select([
+            "KODE TIMKER",  # Kolom pertama
+            pl.all().exclude("KODE TIMKER")  # Kolom lainnya
+        ])
+
+        rekap_oa = pl.concat([sulbar, rekap_oa])
+
+        rekap_oa = rekap_oa.with_columns(
+            pl.when(
+                pl.col("KODE TIMKER") == "Sulbar"
+            )
+            .then(pl.lit("Sulbar"))
+            .otherwise(
+                pl.lit("Timker")
+            )
+            .alias("color")
+        )
+
+        color_map = {
+            'Sulbar': 'blue',
+            'Timker': 'red'
+        }
+
+        fig = px.scatter(rekap_oa, x="% ANGGARAN", y="% CAPAIAN", 
+                        text="KODE TIMKER", color="color", 
+                        color_discrete_map=color_map,
+                        labels={"color": "KELOMPOK"})
+        
+        fig.update_traces(marker=dict(size=15), textposition='top center')  # Ubah ukuran point
+        fig.update_layout(
+            plot_bgcolor='white',  # Background plot
+            paper_bgcolor='white'  # Background keseluruhan
+        )
+        # Menambahkan persegi panjang (rectangles) ke dalam layout
+        fig.update_layout(
+            shapes=[
+                # Persegi panjang pertama
+                dict(
+                    type="rect",
+                    x0=50, x1=105,  # Koordinat X untuk persegi panjang
+                    y0=50, y1=105,  # Koordinat Y untuk persegi panjang
+                    line=dict(color="green"),  # Warna garis tepi
+                    fillcolor="lightblue",  # Warna isi
+                    opacity=0.2  # Transparansi persegi panjang
+                ),
+                # Persegi panjang kedua
+                dict(
+                    type="rect",
+                    x0=0, x1=50,  # Koordinat X untuk persegi panjang
+                    y0=0, y1=50,  # Koordinat Y untuk persegi panjang
+                    line=dict(color="red"),  # Warna garis tepi
+                    fillcolor="pink",  # Warna isi
+                    opacity=0.2  # Transparansi persegi panjang
+                )
+            ]
+        )
+        return fig
 
 app = App(app_ui, server)
