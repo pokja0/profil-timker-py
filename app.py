@@ -8,6 +8,8 @@ from shinywidgets import output_widget, render_widget
 from itables import show
 from itables.shiny import DT
 
+import shinyswatch
+
 app_ui = ui.page_sidebar(
     ui.sidebar(
         ui.input_radio_buttons("radio_timker", "Pilih Timker", choices=["Seluruh Tim Kerja", "Pilih"], selected="Seluruh Tim Kerja"),
@@ -17,9 +19,6 @@ app_ui = ui.page_sidebar(
         open="desktop",
         
     ),  
-    ui.img(
-        src = "https://bkkbnsulbar.id/wp-content/uploads/2022/12/cropped-logobkkbnsulbar.png", width = "200px", style = "justice-"
-    ),
     ui.card(
         ui.card_header(
             "PERSENTASE OUTPUT & ANGGARAN"
@@ -51,7 +50,9 @@ app_ui = ui.page_sidebar(
                 ui.output_ui("itables_rincian")
             )
         )
-    )
+    ),
+    #theme=shinyswatch.theme.lux,
+    title="Capaian Komponen TA 2024",
 )
 
 
@@ -119,8 +120,7 @@ def server(input, output, session):
 
         output_anggaran = output_anggaran.fill_nan(0)
         return output_anggaran
-
-    
+  
     @render.ui
     def input_timker():
         output_anggaran = tabel_rincian()
@@ -164,7 +164,6 @@ def server(input, output, session):
             timker = input.pilihan_timker()
 
         val_timker.set(timker)
-
 
     @reactive.calc
     def tabel_rekap():
@@ -211,8 +210,6 @@ def server(input, output, session):
         rekap_oa = pl.concat([sulbar, rekap_oa])
         return rekap_oa
 
-    #@reactive.calc
-    
     @render_widget
     @reactive.event(input.tampilkan)
     def sp_output_realisasi():
@@ -283,7 +280,7 @@ def server(input, output, session):
         color_map = {
             '>= 50%': '#77dd77',
             '< 50%': '#d9544d',
-            'Sulbar': 'lightblue',
+            'Sulbar': 'blue',
         }
 
         category_order = ['>= 50%', '< 50%', 'Sulbar']
