@@ -5,6 +5,9 @@ import plotly.express as px
 
 from shinywidgets import output_widget, render_widget  
 
+from itables import show
+from itables.shiny import DT
+
 app_ui = ui.page_sidebar(
     ui.sidebar(
         ui.input_radio_buttons("radio_timker", "Pilih Timker", choices=["Seluruh Tim Kerja", "Pilih"], selected="Seluruh Tim Kerja"),
@@ -26,9 +29,27 @@ app_ui = ui.page_sidebar(
     ui.layout_column_wrap(
         ui.card(
             ui.card_header(
-                "% OUTPYT"
+                "% OUTPUT"
             ),
             output_widget("bar_output")
+        ),
+        ui.card(
+            ui.card_header(
+                "% REALISASI"
+            ),
+            output_widget("bar_anggaran")
+        )
+    ),
+    ui.layout_column_wrap(
+        ui.navset_card_pill(
+            ui.nav_panel(
+                "TABEL REKAP",
+                ui.output_ui("itables_rekap")
+            ),
+            ui.nav_panel(
+                "TABEL RINCIAN",
+                ui.output_ui("itables_rincian")
+            )
         )
     )
 )
@@ -36,66 +57,73 @@ app_ui = ui.page_sidebar(
 
 def server(input, output, session):
     output_anggaran = pl.read_excel("data/Capaian Output dan Komponen TA.2024.xlsx")
-    output_anggaran = output_anggaran.select(pl.exclude(["PERMASALAHAN", "SATUAN CAPAIAN", "PERSENTASE REALISASI ANGGARAN"]))
-    output_anggaran = output_anggaran.drop_nulls()
-    output_anggaran = output_anggaran.with_columns(
-            (pl.when(pl.col('TIM KERJA')=='Hukum, Kepegawaian Umum dan Pelayanan Publik')
-                    .then(pl.lit('Hukum, Kepegawaian, Umum dan Pelayanan Publik'))
-                    .otherwise(pl.col('TIM KERJA')))
-                .alias('TIM KERJA')
-                    )
-    output_anggaran = output_anggaran.with_columns(
-        pl.when(
-            pl.col("PERSENTASE CAPAIAN") > 100
+    
+    @reactive.calc
+    def tabel_rincian():
+        output_anggaran = pl.read_excel("data/Capaian Output dan Komponen TA.2024.xlsx")
+        output_anggaran = output_anggaran.select(pl.exclude(["PERMASALAHAN", "SATUAN CAPAIAN", "PERSENTASE REALISASI ANGGARAN"]))
+        output_anggaran = output_anggaran.drop_nulls()
+        output_anggaran = output_anggaran.with_columns(
+                (pl.when(pl.col('TIM KERJA')=='Hukum, Kepegawaian Umum dan Pelayanan Publik')
+                        .then(pl.lit('Hukum, Kepegawaian, Umum dan Pelayanan Publik'))
+                        .otherwise(pl.col('TIM KERJA')))
+                    .alias('TIM KERJA')
+                        )
+        output_anggaran = output_anggaran.with_columns(
+            pl.when(
+                pl.col("PERSENTASE CAPAIAN") > 100
+            )
+            .then(100)
+            .otherwise(
+                pl.col("PERSENTASE CAPAIAN")
+            )
+            .alias("PERSENTASE CAPAIAN")
         )
-        .then(100)
-        .otherwise(
-            pl.col("PERSENTASE CAPAIAN")
+        output_anggaran = output_anggaran.with_columns(
+            pl.when(pl.col("TIM KERJA") == "Akses, Kualitas Layanan KB dan Kesehatan Reproduksi")
+            .then(pl.lit("KB"))
+            .when(pl.col("TIM KERJA") == "Hubungan Antar Lembaga, Advokasi, KIE dan Kehumasan")
+            .then(pl.lit("Advokasi"))
+            .when(pl.col("TIM KERJA") == "Hukum, Kepegawaian, Umum dan Pelayanan Publik")
+            .then(pl.lit("Kepegawaian"))
+            .when(pl.col("TIM KERJA") == "Ketahanan Keluarga")
+            .then(pl.lit("KS"))
+            .when(pl.col("TIM KERJA") == "Keuangan, Anggaran dan Pengelolaan BMN")
+            .then(pl.lit("Keuangan"))
+            .when(pl.col("TIM KERJA") == "Pelaporan dan Statistik dan Pengelolaan TIK")
+            .then(pl.lit("Datin"))
+            .when(pl.col("TIM KERJA") == "Pelatihan dan Peningkatan Kompetensi")
+            .then(pl.lit("Latbang"))
+            .when(pl.col("TIM KERJA") == "Pencegahan Stunting")
+            .then(pl.lit("Stunting"))
+            .when(pl.col("TIM KERJA") == "Pengelolaan dan Pembinaan Tenaga Lini Lapangan")
+            .then(pl.lit("Linlap"))
+            .when(pl.col("TIM KERJA") == "Pengendalian Penduduk")
+            .then(pl.lit("Dalduk"))
+            .when(pl.col("TIM KERJA") == "Perencanaan dan Manajemen Kinerja")
+            .then(pl.lit("Perencanaan"))
+            .when(pl.col("TIM KERJA") == "ZI WBK/WBBM dan SPIP")
+            .then(pl.lit("ZI"))
+            .otherwise(pl.lit("D"))
+            .alias("KODE TIMKER")
         )
-        .alias("PERSENTASE CAPAIAN")
-    )
-    output_anggaran = output_anggaran.with_columns(
-        pl.when(pl.col("TIM KERJA") == "Akses, Kualitas Layanan KB dan Kesehatan Reproduksi")
-        .then(pl.lit("KB"))
-        .when(pl.col("TIM KERJA") == "Hubungan Antar Lembaga, Advokasi, KIE dan Kehumasan")
-        .then(pl.lit("Advokasi"))
-        .when(pl.col("TIM KERJA") == "Hukum, Kepegawaian, Umum dan Pelayanan Publik")
-        .then(pl.lit("Kepegawaian"))
-        .when(pl.col("TIM KERJA") == "Ketahanan Keluarga")
-        .then(pl.lit("KS"))
-        .when(pl.col("TIM KERJA") == "Keuangan, Anggaran dan Pengelolaan BMN")
-        .then(pl.lit("Keuangan"))
-        .when(pl.col("TIM KERJA") == "Pelaporan dan Statistik dan Pengelolaan TIK")
-        .then(pl.lit("Datin"))
-        .when(pl.col("TIM KERJA") == "Pelatihan dan Peningkatan Kompetensi")
-        .then(pl.lit("Latbang"))
-        .when(pl.col("TIM KERJA") == "Pencegahan Stunting")
-        .then(pl.lit("Stunting"))
-        .when(pl.col("TIM KERJA") == "Pengelolaan dan Pembinaan Tenaga Lini Lapangan")
-        .then(pl.lit("Linlap"))
-        .when(pl.col("TIM KERJA") == "Pengendalian Penduduk")
-        .then(pl.lit("Dalduk"))
-        .when(pl.col("TIM KERJA") == "Perencanaan dan Manajemen Kinerja")
-        .then(pl.lit("Perencanaan"))
-        .when(pl.col("TIM KERJA") == "ZI WBK/WBBM dan SPIP")
-        .then(pl.lit("ZI"))
-        .otherwise(pl.lit("D"))
-        .alias("KODE TIMKER")
-    )
 
-    output_anggaran = output_anggaran.with_columns(
-        (pl.col("REALISASI ANGGARAN") / pl.col("PAGU ANGGARAN")*100).alias("PERSENTASE REALISASI ANGGARAN")
-    )
+        output_anggaran = output_anggaran.with_columns(
+            (pl.col("REALISASI ANGGARAN") / pl.col("PAGU ANGGARAN")*100).alias("PERSENTASE REALISASI ANGGARAN")
+        )
 
-    output_anggaran = output_anggaran.with_columns(
-        pl.col("PERSENTASE CAPAIAN").round(2),
-        pl.col("PERSENTASE REALISASI ANGGARAN").round(2)
-    )
+        output_anggaran = output_anggaran.with_columns(
+            pl.col("PERSENTASE CAPAIAN").round(2),
+            pl.col("PERSENTASE REALISASI ANGGARAN").round(2)
+        )
 
-    output_anggaran = output_anggaran.fill_nan(0)
+        output_anggaran = output_anggaran.fill_nan(0)
+        return output_anggaran
 
+    
     @render.ui
     def input_timker():
+        output_anggaran = tabel_rincian()
         pilihan_timker = output_anggaran.select(pl.col("KODE TIMKER").unique())
         pilihan_timker = pilihan_timker["KODE TIMKER"].to_list()
         #pilihan_timker = output_anggaran.select(pl.col("TIM KERJA").unique()).to_numpy()
@@ -129,6 +157,7 @@ def server(input, output, session):
     val_timker = reactive.value(0)
     @reactive.effect
     def _():
+        output_anggaran = tabel_rincian()
         if input.radio_timker() == "Seluruh Tim Kerja":
             timker = output_anggaran.select(pl.col("KODE TIMKER").unique())
         else:
@@ -136,9 +165,11 @@ def server(input, output, session):
 
         val_timker.set(timker)
 
+
     @reactive.calc
     def tabel_rekap():
-        rekap_oa = output_anggaran.group_by("KODE TIMKER").agg([
+        rincian_tabel = tabel_rincian()
+        rekap_oa = rincian_tabel.group_by("KODE TIMKER").agg([
             pl.col("PAGU ANGGARAN").sum(),
             pl.col("REALISASI ANGGARAN").sum(),
             (pl.col("REALISASI ANGGARAN").sum() / pl.col("PAGU ANGGARAN").sum() *100).alias("% ANGGARAN").round(2),
@@ -180,7 +211,8 @@ def server(input, output, session):
         rekap_oa = pl.concat([sulbar, rekap_oa])
         return rekap_oa
 
-
+    #@reactive.calc
+    
     @render_widget
     @reactive.event(input.tampilkan)
     def sp_output_realisasi():
@@ -236,7 +268,7 @@ def server(input, output, session):
         return fig
 
     @render_widget
-    #@reactive.event(input_tampilkan)
+    @reactive.event(input.tampilkan)
     def bar_output():
         rekap_oa = tabel_rekap()
         rekap_oa = rekap_oa.with_columns(
@@ -245,7 +277,7 @@ def server(input, output, session):
             .when(pl.col("KODE TIMKER") != "Sulbar", pl.col("% CAPAIAN") >= 50)
             .then(pl.lit(">= 50%"))
             .otherwise(pl.lit("< 50%"))
-            .alias("KODE CAPAIAN")
+            .alias("KET:")
         )
 
         color_map = {
@@ -257,11 +289,11 @@ def server(input, output, session):
         category_order = ['>= 50%', '< 50%', 'Sulbar']
         # Membuat horizontal bar chart
         fig = px.bar(
-            rekap_oa_bar,
+            rekap_oa,
             x='% CAPAIAN',
             y='KODE TIMKER',
-            color="KODE CAPAIAN", 
-            category_orders={'KODE CAPAIAN': category_order},
+            color="KET:", 
+            category_orders={'KET': category_order},
             color_discrete_map=color_map,
             orientation='h',  # 'h' untuk horizontal
             text='% CAPAIAN'    # Menambahkan label di bar
@@ -272,5 +304,100 @@ def server(input, output, session):
 
         # Menampilkan chart
         return fig
+
+    @render_widget
+    @reactive.event(input.tampilkan)
+    def bar_anggaran():
+        rekap_oa = tabel_rekap()
+        rekap_oa = rekap_oa.with_columns(
+            pl.when(pl.col("KODE TIMKER") == "Sulbar")
+            .then(pl.lit("Sulbar"))
+            .when(pl.col("KODE TIMKER") != "Sulbar", pl.col("% ANGGARAN") >= 50)
+            .then(pl.lit(">= 50%"))
+            .otherwise(pl.lit("< 50%"))
+            .alias("KET")
+        )
+
+        color_map = {
+            '>= 50%': '#77dd77',
+            '< 50%': '#d9544d',
+            'Sulbar': 'blue',
+        }
+
+        category_order = ['>= 50%', '< 50%', 'Sulbar']
+        # Membuat horizontal bar chart
+        fig = px.bar(
+            rekap_oa,
+            x='% ANGGARAN',
+            y='KODE TIMKER',
+            color="KET", 
+            category_orders={'KET': category_order},
+            color_discrete_map=color_map,
+            orientation='h',  # 'h' untuk horizontal
+            text='% ANGGARAN'    # Menambahkan label di bar
+        )
+
+        fig.update_layout(yaxis={'categoryorder':'total ascending'})
+        fig.update_traces(textposition='outside')
+
+        # Menampilkan chart
+        return fig
+
+    @render.ui
+    @reactive.event(input.tampilkan)
+    def itables_rekap():
+        rekap_oa_pandas = tabel_rekap()
+        rekap_oa_pandas = rekap_oa_pandas.filter(
+            pl.col("KODE TIMKER").is_in(val_timker.get())
+        )
+        
+        rekap_oa_pandas = rekap_oa_pandas.to_pandas()
+        
+        rekap_oa_pandas["PAGU ANGGARAN"] = rekap_oa_pandas["PAGU ANGGARAN"].map("{:,.0f}".format)
+        rekap_oa_pandas["REALISASI ANGGARAN"] = rekap_oa_pandas["REALISASI ANGGARAN"].map("{:,.0f}".format)
+        return ui.HTML(DT(rekap_oa_pandas.style.background_gradient(
+            subset=["% ANGGARAN", "% CAPAIAN"], 
+            cmap="RdYlGn", 
+            vmin=0, 
+            vmax=100).format(precision=2),
+            buttons=[
+                "pageLength",
+                {"extend": "csvHtml5", "title": "Realisasi Per Timker"},
+                {"extend": "excelHtml5", "title": "Realisasi Per Timker"},
+            ],
+            ))
+        
+    @render.ui
+    @reactive.event(input.tampilkan)
+    def itables_rincian():
+        output_anggaran_rincian = tabel_rincian()
+        output_anggaran_rincian = output_anggaran_rincian.filter(
+            pl.col("KODE TIMKER").is_in(val_timker.get())
+        )
+        output_anggaran_rincian = output_anggaran_rincian.with_columns(
+            (pl.col("PAGU ANGGARAN") - pl.col("REALISASI ANGGARAN")).alias("SISA ANGGARAN")
+        )
+        
+        output_anggaran_rincian = output_anggaran_rincian.to_pandas()
+        output_anggaran_rincian["REALISASI ANGGARAN"] = output_anggaran_rincian["REALISASI ANGGARAN"].map("{:,.0f}".format)
+        output_anggaran_rincian["PAGU ANGGARAN"] = output_anggaran_rincian["PAGU ANGGARAN"].map("{:,.0f}".format)
+        output_anggaran_rincian["SISA ANGGARAN"] = output_anggaran_rincian["SISA ANGGARAN"].map("{:,.0f}".format)
+        
+        output_anggaran_rincian = output_anggaran_rincian[['KODE TIMKER', 'KODE', 'URAIAN', 'PERSENTASE CAPAIAN', 'PERSENTASE REALISASI ANGGARAN',
+                                                           'TARGET', 'SATUAN \n TARGET', 'CAPAIAN', 'PAGU ANGGARAN',
+                                                           'REALISASI ANGGARAN', 'SISA ANGGARAN']]
+        return ui.HTML(
+            DT(output_anggaran_rincian.style.background_gradient(
+                subset=["PERSENTASE CAPAIAN", "PERSENTASE REALISASI ANGGARAN"], 
+                cmap="RdYlGn", 
+                vmin=0, 
+                vmax=100).format(precision=2),
+                buttons=[
+                    "pageLength",
+                    {"extend": "csvHtml5", "title": "Realisasi Per Timker"},
+                    {"extend": "excelHtml5", "title": "Realisasi Per Timker"},
+                ],
+            )
+        )
 
 app = App(app_ui, server)

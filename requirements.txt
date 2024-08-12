@@ -41,6 +41,7 @@ linkify-it-py==2.0.3
 markdown-it-py==3.0.0
 MarkupSafe==2.1.5
 matplotlib-inline==0.1.7
+matplotlib==3.9.1.post1
 mdit-py-plugins==0.4.1
 mdurl==0.1.2
 nbformat==5.10.4
