@@ -8,7 +8,7 @@ from shinywidgets import output_widget, render_widget
 from itables import show
 from itables.shiny import DT
 
-import shinyswatch
+from pathlib import Path
 
 app_ui = ui.page_sidebar(
     ui.sidebar(
@@ -51,7 +51,7 @@ app_ui = ui.page_sidebar(
             )
         )
     ),
-    #theme=shinyswatch.theme.lux,
+    ui.tags.link(href="style.css", rel="stylesheet"),
     title="Capaian Komponen TA 2024",
 )
 
@@ -172,6 +172,7 @@ def server(input, output, session):
             pl.col("PAGU ANGGARAN").sum(),
             pl.col("REALISASI ANGGARAN").sum(),
             (pl.col("REALISASI ANGGARAN").sum() / pl.col("PAGU ANGGARAN").sum() *100).alias("% ANGGARAN").round(2),
+            (pl.col("PAGU ANGGARAN").sum() - pl.col("REALISASI ANGGARAN").sum()).alias("SISA ANGGARAN"),
             (pl.col("KODE").n_unique().alias("JUMLAH KOMPONEN")),
             (pl.col("PERSENTASE CAPAIAN") >= 100).sum().alias("TERCAPAI"),
         ]).with_columns(
@@ -185,10 +186,11 @@ def server(input, output, session):
             pl.col("KODE TIMKER").is_in(val_timker.get())
         )
 
-        sulbar = output_anggaran.select([
+        sulbar = rincian_tabel.select([
             pl.col("PAGU ANGGARAN").sum(),
             pl.col("REALISASI ANGGARAN").sum(),
             (pl.col("REALISASI ANGGARAN").sum() / pl.col("PAGU ANGGARAN").sum() *100).alias("% ANGGARAN").round(2),
+            (pl.col("PAGU ANGGARAN").sum() - pl.col("REALISASI ANGGARAN").sum()).alias("SISA ANGGARAN"),
             (pl.col("KODE").n_unique().alias("JUMLAH KOMPONEN")),
             (pl.col("PERSENTASE CAPAIAN") >= 100).sum().alias("TERCAPAI"),
         ]).with_columns(
@@ -296,10 +298,23 @@ def server(input, output, session):
             text='% CAPAIAN'    # Menambahkan label di bar
         )
 
-        fig.update_layout(yaxis={'categoryorder':'total ascending'})
+        fig.update_layout(
+            yaxis={'categoryorder':'total ascending'})
         fig.update_traces(textposition='outside')
-
-        # Menampilkan chart
+        fig.update_xaxes(range=[0, 110])  # Mengatur xlim
+        fig.update_layout(
+            plot_bgcolor='rgba(0,0,0,0)',  # Background plot
+            paper_bgcolor='rgba(0,0,0,0)'  # Background keseluruhan
+        )
+        # fig.update_layout(
+        #     legend=dict(
+        #         orientation="h",  # Horizontal legend
+        #         yanchor="bottom",
+        #         y=1.02,  # Menempatkan di atas plot
+        #         xanchor="center",
+        #         x=0.5
+        #     )
+        # )
         return fig
 
     @render_widget
@@ -336,7 +351,11 @@ def server(input, output, session):
 
         fig.update_layout(yaxis={'categoryorder':'total ascending'})
         fig.update_traces(textposition='outside')
-
+        fig.update_xaxes(range=[0, 110])
+        fig.update_layout(
+            plot_bgcolor='rgba(0,0,0,0)',  # Background plot
+            paper_bgcolor='rgba(0,0,0,0)'  # Background keseluruhan
+        )
         # Menampilkan chart
         return fig
 
@@ -344,14 +363,12 @@ def server(input, output, session):
     @reactive.event(input.tampilkan)
     def itables_rekap():
         rekap_oa_pandas = tabel_rekap()
-        rekap_oa_pandas = rekap_oa_pandas.filter(
-            pl.col("KODE TIMKER").is_in(val_timker.get())
-        )
         
         rekap_oa_pandas = rekap_oa_pandas.to_pandas()
         
         rekap_oa_pandas["PAGU ANGGARAN"] = rekap_oa_pandas["PAGU ANGGARAN"].map("{:,.0f}".format)
         rekap_oa_pandas["REALISASI ANGGARAN"] = rekap_oa_pandas["REALISASI ANGGARAN"].map("{:,.0f}".format)
+        rekap_oa_pandas["SISA ANGGARAN"] = rekap_oa_pandas["SISA ANGGARAN"].map("{:,.0f}".format)
         return ui.HTML(DT(rekap_oa_pandas.style.background_gradient(
             subset=["% ANGGARAN", "% CAPAIAN"], 
             cmap="RdYlGn", 
@@ -397,4 +414,5 @@ def server(input, output, session):
             )
         )
 
-app = App(app_ui, server)
+app_dir = Path(__file__).parent
+app = App(app_ui, server, static_assets=app_dir / "www")
