@@ -118,29 +118,46 @@ def server(input, output, session):
             select_timker
         )
     
-    @render_widget
-    #@reactive.event(input.action_button)
-    def sp_output_realisasi():
-        rekap_oa = output_anggaran.group_by(
-            "KODE TIMKER"
-        ).agg(
-            [pl.col("PERSENTASE CAPAIAN").mean().alias("% CAPAIAN").round(2),
-            pl.col("PERSENTASE REALISASI ANGGARAN").mean().alias("% ANGGARAN").round(2)]
-        )
-
+    val_timker = reactive.value(0)
+    @reactive.effect
+    def _():
         if input.radio_timker() == "Seluruh Tim Kerja":
-            filter_timker = output_anggaran.select(pl.col("KODE TIMKER").unique())
-            filter_timker = filter_timker["KODE TIMKER"].to_list()
+            timker = output_anggaran.select(pl.col("KODE TIMKER").unique())
         else:
-            filter_timker = input.pilihan_timker()
+            timker = input.pilihan_timker()
+
+        val_timker.set(timker)
+
+    @reactive.calc
+    def tabel_rekap():
+        rekap_oa = output_anggaran.group_by("KODE TIMKER").agg([
+            pl.col("PAGU ANGGARAN").sum(),
+            pl.col("REALISASI ANGGARAN").sum(),
+            (pl.col("REALISASI ANGGARAN").sum() / pl.col("PAGU ANGGARAN").sum() *100).alias("% ANGGARAN").round(2),
+            (pl.col("KODE").n_unique().alias("JUMLAH KOMPONEN")),
+            (pl.col("PERSENTASE CAPAIAN") >= 100).sum().alias("TERCAPAI"),
+        ]).with_columns(
+            (pl.col("JUMLAH KOMPONEN") - pl.col("TERCAPAI")).alias("BELUM TERCAPAI")
+
+        ).with_columns(
+            ((pl.col("TERCAPAI") / pl.col("JUMLAH KOMPONEN"))*100).round(2).alias("% CAPAIAN")
+        )
 
         rekap_oa = rekap_oa.filter(
-            pl.col("KODE TIMKER").is_in(filter_timker)
+            pl.col("KODE TIMKER").is_in(val_timker.get())
         )
 
-        sulbar = output_anggaran.select(
-            pl.col("PERSENTASE CAPAIAN").mean().alias("% CAPAIAN").round(2),
-            pl.col("PERSENTASE REALISASI ANGGARAN").mean().alias("% ANGGARAN").round(2)
+        sulbar = output_anggaran.select([
+            pl.col("PAGU ANGGARAN").sum(),
+            pl.col("REALISASI ANGGARAN").sum(),
+            (pl.col("REALISASI ANGGARAN").sum() / pl.col("PAGU ANGGARAN").sum() *100).alias("% ANGGARAN").round(2),
+            (pl.col("KODE").n_unique().alias("JUMLAH KOMPONEN")),
+            (pl.col("PERSENTASE CAPAIAN") >= 100).sum().alias("TERCAPAI"),
+        ]).with_columns(
+            (pl.col("JUMLAH KOMPONEN") - pl.col("TERCAPAI")).alias("BELUM TERCAPAI")
+
+        ).with_columns(
+            ((pl.col("TERCAPAI") / pl.col("JUMLAH KOMPONEN"))*100).round(2).alias("% CAPAIAN")
         )
 
         # Menambahkan kolom "KODE TIMKER" dengan nilai "Sulbar"
@@ -153,7 +170,13 @@ def server(input, output, session):
         ])
 
         rekap_oa = pl.concat([sulbar, rekap_oa])
+        return rekap_oa
 
+
+    @render_widget
+    @reactive.event(input.tampilkan)
+    def sp_output_realisasi():
+        rekap_oa = tabel_rekap()
         rekap_oa = rekap_oa.with_columns(
             pl.when(
                 pl.col("KODE TIMKER") == "Sulbar"
@@ -164,7 +187,6 @@ def server(input, output, session):
             )
             .alias("color")
         )
-
         color_map = {
             'Sulbar': 'blue',
             'Timker': 'red'
@@ -186,8 +208,8 @@ def server(input, output, session):
                 # Persegi panjang pertama
                 dict(
                     type="rect",
-                    x0=50, x1=105,  # Koordinat X untuk persegi panjang
-                    y0=50, y1=105,  # Koordinat Y untuk persegi panjang
+                    x0=50, x1=110,  # Koordinat X untuk persegi panjang
+                    y0=50, y1=110,  # Koordinat Y untuk persegi panjang
                     line=dict(color="green"),  # Warna garis tepi
                     fillcolor="lightblue",  # Warna isi
                     opacity=0.2  # Transparansi persegi panjang
@@ -195,8 +217,8 @@ def server(input, output, session):
                 # Persegi panjang kedua
                 dict(
                     type="rect",
-                    x0=0, x1=50,  # Koordinat X untuk persegi panjang
-                    y0=0, y1=50,  # Koordinat Y untuk persegi panjang
+                    x0=-10, x1=50,  # Koordinat X untuk persegi panjang
+                    y0=-10, y1=50,  # Koordinat Y untuk persegi panjang
                     line=dict(color="red"),  # Warna garis tepi
                     fillcolor="pink",  # Warna isi
                     opacity=0.2  # Transparansi persegi panjang
