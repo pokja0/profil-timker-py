@@ -22,6 +22,14 @@ app_ui = ui.page_sidebar(
             "PERSENTASE OUTPUT & ANGGARAN"
         ),
         output_widget("sp_output_realisasi")
+    ),
+    ui.layout_column_wrap(
+        ui.card(
+            ui.card_header(
+                "% OUTPYT"
+            ),
+            output_widget("bar_output")
+        )
     )
 )
 
@@ -225,6 +233,44 @@ def server(input, output, session):
                 )
             ]
         )
+        return fig
+
+    @render_widget
+    #@reactive.event(input_tampilkan)
+    def bar_output():
+        rekap_oa = tabel_rekap()
+        rekap_oa = rekap_oa.with_columns(
+            pl.when(pl.col("KODE TIMKER") == "Sulbar")
+            .then(pl.lit("Sulbar"))
+            .when(pl.col("KODE TIMKER") != "Sulbar", pl.col("% CAPAIAN") >= 50)
+            .then(pl.lit(">= 50%"))
+            .otherwise(pl.lit("< 50%"))
+            .alias("KODE CAPAIAN")
+        )
+
+        color_map = {
+            '>= 50%': '#77dd77',
+            '< 50%': '#d9544d',
+            'Sulbar': 'lightblue',
+        }
+
+        category_order = ['>= 50%', '< 50%', 'Sulbar']
+        # Membuat horizontal bar chart
+        fig = px.bar(
+            rekap_oa_bar,
+            x='% CAPAIAN',
+            y='KODE TIMKER',
+            color="KODE CAPAIAN", 
+            category_orders={'KODE CAPAIAN': category_order},
+            color_discrete_map=color_map,
+            orientation='h',  # 'h' untuk horizontal
+            text='% CAPAIAN'    # Menambahkan label di bar
+        )
+
+        fig.update_layout(yaxis={'categoryorder':'total ascending'})
+        fig.update_traces(textposition='outside')
+
+        # Menampilkan chart
         return fig
 
 app = App(app_ui, server)
